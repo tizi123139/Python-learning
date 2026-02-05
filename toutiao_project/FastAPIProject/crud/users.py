@@ -1,9 +1,10 @@
 import datetime
 
+from fastapi import HTTPException,status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select,update
 from models.users import User, UserToken
-from schemas.users import UserRequest
+from schemas.users import UserRequest, UserUpdateRequest
 from utils import security
 import uuid
 
@@ -62,3 +63,29 @@ async def get_user_by_token(db:AsyncSession, token:str):
     query = select(User).where(User.id == db_token.user_id)
     result = await db.execute(query)
     return result.scalars().one_or_none()
+
+
+async def update_user(db:AsyncSession, username:str,user_data:UserUpdateRequest):
+    query=update(User).where(User.username == user_data.username).values(**user_data.model_dump(
+        exclude_unset=True,
+        exclude_none=True,
+    ))
+    result=await db.execute(query)
+    await db.commit()
+
+    if result.rowcount==0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="User not found")
+
+    updated_user = await get_user_by_username(db, username)
+    return updated_user
+
+async def change_password(db:AsyncSession, user:User,old_password:str,new_password:str):
+    if not security.verify_password(old_password, user.password):
+        return False
+
+    hashed_new_pwd = security.get_hash_password(new_password)
+    user.password = hashed_new_pwd
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return True
