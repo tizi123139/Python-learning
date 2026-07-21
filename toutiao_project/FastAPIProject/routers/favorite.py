@@ -59,5 +59,5 @@ async def clear_favorite(
         user:User=Depends(get_current_user),
         db:AsyncSession=Depends(get_db)
 ):
-    count = await favorite.remove_all_favorite(db,user.id)
+    count = await favorite.remove_all_favorites(db,user.id)
     return success_response(message="清空了{count}")
